@@ -1,0 +1,51 @@
+# Analyzes source code using linters and runs tests
+name: Code delivery
+
+# Triggers the workflow on pull request events
+# only for the "main" destination branch.
+on:
+  pull_request:
+    types: [ opened, synchronize, ready_for_review ]
+    branches:
+      - main
+
+jobs:
+  # Fails if the PR is in the Draft state,
+  # so GitHub Actions Workflow minutes won't be wasted.
+  fail_if_pull_request_is_draft:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Fail on Draft PR to not waste GHAW minutes $$
+        if: github.event.pull_request.draft == true
+        run: exit 1
+
+      - name: Pass on Ready PR
+        if: github.event.pull_request.draft == false
+        run: echo "PR is ready to be reviewed - passing..."
+
+  code_analysis:
+    runs-on: ubuntu-22.04
+    steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so job can access it
+      - name: Checkout last PR commit
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Setup Python environment and cache dependencies
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.7'
+          cache: 'poetry'
+
+      - name: Install Python dependencies
+        run: poetry install
+
+      - name: Run code analysis
+        run: poetry run check
+
+      - name: Run unit-tests
+        run: poetry run pytest -m "not integration"
